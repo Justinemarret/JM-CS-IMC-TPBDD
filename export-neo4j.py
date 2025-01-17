@@ -41,24 +41,19 @@ with pyodbc.connect('DRIVER='+driver+';SERVER=tcp:'+server+';PORT=1433;DATABASE=
         if not rows:
             break
 
-        i = 0
         for row in rows:
             # Créer un objet Node avec comme label Film et les propriétés adéquates
-            n = Node("Film", idFilm=row.idFilm, primaryTitle=row.primaryTitle, startYear=row.startYear)
+            n = Node("Film", idFilm=row[0], primaryTitle=row[1], startYear=row[2])
             importData.append(n)
-            i += 1
 
         try:
-            # A competer 
             create_nodes(graph.auto(), importData, labels={"Film"})
             exportedCount += len(rows)
             print(f"{exportedCount}/{totalCount} title records exported to Neo4j")
         except Exception as error:
             print(error)
 
-    # Names
-    # En vous basant sur ce qui a été fait dans la section précédente, exportez les données de la table tArtist dans Neo4j
-    # A COMPLETER
+    # Artists
     exportedCount = 0
     cursor.execute("SELECT COUNT(1) FROM tArtist")
     totalCount = cursor.fetchval()
@@ -70,7 +65,8 @@ with pyodbc.connect('DRIVER='+driver+';SERVER=tcp:'+server+';PORT=1433;DATABASE=
             break
 
         for row in rows:
-            n = Node("Artist", idArtist=row.idArtist, primaryName=row.primaryName, birthYear=row.birthYear)
+            # Créer un objet Node avec comme label Artist et les propriétés adéquates
+            n = Node("Artist", idArtist=row[0], primaryName=row[1], birthYear=row[2])
             importData.append(n)
 
         try:
@@ -79,16 +75,42 @@ with pyodbc.connect('DRIVER='+driver+';SERVER=tcp:'+server+';PORT=1433;DATABASE=
             print(f"{exportedCount}/{totalCount} artist records exported to Neo4j")
         except Exception as error:
             print(error)
-    
-    
 
     try:
+        print("Dropping existing indexes...")
+
+        # Vérification de l'existence de l'index avant de le supprimer
+        result = graph.run("SHOW INDEXES YIELD name")
+        existing_indexes = [record["name"] for record in result]
+        
+        # Dropping Film index if it exists
+        if "index_film_idFilm" in existing_indexes:
+            print("Dropping existing index on Film(idFilm)...")
+            graph.run("DROP INDEX ON :Film(idFilm)")
+        
+        # Dropping Artist index if it exists
+        if "index_artist_idArtist" in existing_indexes:
+            print("Dropping existing index on Artist(idArtist)...")
+            graph.run("DROP INDEX ON :Artist(idArtist)")
+
         print("Indexing Film nodes...")
-        graph.run("CREATE INDEX FOR (f:Film) ON (f.idFilm)")
-        print("Indexing Name (Artist) nodes...")
-        graph.run("CREATE INDEX FOR (a:Artist) ON (a.idArtist)")
+        # Create index if it doesn't exist already
+        if "index_film_idFilm" not in existing_indexes:
+            print("Creating index on Film(idFilm)...")
+            graph.run("CREATE INDEX film_idFilm FOR (f:Film) ON (f.idFilm)")
+        
+        print("Indexing Artist nodes...")
+        # Create index if it doesn't exist already
+        if "index_artist_idArtist" not in existing_indexes:
+            print("Creating index on Artist(idArtist)...")
+            graph.run("CREATE INDEX artist_idArtist FOR (a:Artist) ON (a.idArtist)")
+            
+        print("Indexes are created/updated successfully.")
+        
     except Exception as error:
-        print(error)
+        print("Error: ", error)
+
+
 
 
     # Relationships
@@ -103,8 +125,10 @@ with pyodbc.connect('DRIVER='+driver+';SERVER=tcp:'+server+';PORT=1433;DATABASE=
             break
 
         for row in rows:
-            relTuple=(row[0], {}, row[2])
+            relTuple = (row[0], {}, row[2])
             importData[row[1]].append(relTuple)
+           #print(f"Adding relationship: {row[0]} - {row[1]} -> {row[2]}")
+
 
         try:
             for cat in importData:
@@ -112,9 +136,7 @@ with pyodbc.connect('DRIVER='+driver+';SERVER=tcp:'+server+';PORT=1433;DATABASE=
                 # (les tuples nécessaires ont déjà été créés ci-dessus dans la boucle for précédente)
                 # https://py2neo.org/2021.1/bulk/index.html
                 # ATTENTION: remplacez les espaces par des _ pour nommer les types de relation
-                # A COMPLETER
-                create_relationships(graph.auto(), importData[cat], "ACTED_IN" if cat == "acted in" else cat.upper())
-                None # Remplacez None par votre code
+                create_relationships(graph.auto(), importData[cat], cat.replace(" ", "_"))
             exportedCount += len(rows)
             print(f"{exportedCount}/{totalCount} relationships exported to Neo4j")
         except Exception as error:
