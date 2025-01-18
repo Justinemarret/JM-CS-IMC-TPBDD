@@ -49,7 +49,7 @@ with pyodbc.connect('DRIVER='+driver+';SERVER=tcp:'+server+';PORT=1433;DATABASE=
         try:
             create_nodes(graph.auto(), importData, labels={"Film"})
             exportedCount += len(rows)
-            print(f"{exportedCount}/{totalCount} title records exported to Neo4j")
+            print(f"{exportedCount}/{totalCount} film records exported to Neo4j")
         except Exception as error:
             print(error)
 
@@ -136,7 +136,7 @@ with pyodbc.connect('DRIVER='+driver+';SERVER=tcp:'+server+';PORT=1433;DATABASE=
                 # (les tuples nécessaires ont déjà été créés ci-dessus dans la boucle for précédente)
                 # https://py2neo.org/2021.1/bulk/index.html
                 # ATTENTION: remplacez les espaces par des _ pour nommer les types de relation
-                create_relationships(graph.auto(), importData[cat], cat.replace(" ", "_"))
+                create_relationships(graph.auto(), importData[cat], cat.replace(" ", "_"), start_node_key=("Artist", "idArtist"), end_node_key=("Film", "idFilm"))
             exportedCount += len(rows)
             print(f"{exportedCount}/{totalCount} relationships exported to Neo4j")
         except Exception as error:
